@@ -1,0 +1,3 @@
+[submodule "Samarium-PluginFramework"]
+	path = Samarium-PluginFramework
+	url = https://github.com/Beatsleigher/Samarium-PluginFramework.git
