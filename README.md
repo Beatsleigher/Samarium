@@ -31,3 +31,19 @@ To fully clone Samarium and its (core) plugins, make sure to use following comma
 
 Samarium is licensed under the BSD 3-clause ("new" or "simplified") license.
 For more information, see [LICENSE](/LICENSE)
+
+# Getting Started
+
+Getting started with Samarium is super easy!
+To get the gist of it, there are two steps.
+
+### Step 1:
+
+Download, install and configure Elasticsearch.
+Start ES.
+
+### Step 2:
+
+Download and install Samarium.
+Configure Samarium to talk to your ES installation.
+Run Samarium.
