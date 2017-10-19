@@ -4,3 +4,6 @@
 [submodule "Samarium-MailProcessor"]
 	path = Samarium-MailProcessor
 	url = https://github.com/Beatsleigher/Samarium-MailProcessor.git
+[submodule "Samarium-Mobile"]
+	path = Samarium-Mobile
+	url = https://github.com/Beatsleigher/Samarium-Mobile.git
