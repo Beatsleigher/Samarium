@@ -1,3 +1,6 @@
 [submodule "Samarium-PluginFramework"]
 	path = Samarium-PluginFramework
 	url = https://github.com/Beatsleigher/Samarium-PluginFramework.git
+[submodule "Samarium-MailProcessor"]
+	path = Samarium-MailProcessor
+	url = https://github.com/Beatsleigher/Samarium-MailProcessor.git
