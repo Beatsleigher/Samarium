@@ -10,18 +10,18 @@ namespace Samarium {
     using System.Threading.Tasks;
     using global::Samarium.PluginFramework.UI;
 
-    public static class Samarium {
+    public static partial class Samarium {
 
         #region Const and effectively const fields
         const string ApplicationName = nameof(Samarium);
         static readonly Version Version = typeof(Samarium).Assembly.GetName().Version;
 
-        static readonly Dictionary<string, string> Arguments = new Dictionary<string, string> {
-            { "--help", "Prints this help menu." },
-            { "--no-plugins", "Stops automatic plugin loading. Useful for debugging." },
-            { "--exec=\"<cmd>\"", "Executes a command immediately after successful booting." },
-            { "--init", "Re-initialization \"wizard\"" },
-            { "--logdir=\"<dir>\"", "Set the logging directory for this instance." }
+        static readonly List<(string Argument, string Description, Action Handler)> Arguments = new List<(string Argument, string Description, Action Handler)> {
+            ("--help", "Prints this help menu.", PrintHelp),
+            ("--no-plugins", "Stops automatic plugin loading. Useful for debugging.", SetNoPlugins),
+            ("--exec=\"<cmd>\"", "Executes a command immediately after successful booting.", SetAutoExec),
+            ("--init", "Re-initialization \"wizard\"", () => InitWizard()),
+            ("--logdir=\"<dir>\"", "Set the logging directory for this instance.", SetLogDir)
         };
         #endregion
 
@@ -42,19 +42,21 @@ namespace Samarium {
 
         public static int Main(string[] args) {
 
-            #region Unimportant for actual operation
-            if (args.Contains(Arguments.Keys.ElementAt(0))) { // Help
-                PrintHelp();
-                return 0;
-            } else if (args.Contains(Arguments.Keys.First(x => x.Contains("init")))) {
-                var rVal = InitWizard();
-            }
-            #endregion
+            // Start by parsing arguments
 
             
 
             return 0;
         }
+
+        #region Prototypes
+
+        static partial void SetNoPlugins();
+
+        static partial void SetLogDir();
+
+        static partial void SetAutoExec();
+        #endregion
 
         #region For a later date
         public static void PrintHelp() {
