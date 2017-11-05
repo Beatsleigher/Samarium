@@ -16,7 +16,7 @@ namespace Samarium {
         const string ApplicationName = nameof(Samarium);
         static readonly Version Version = typeof(Samarium).Assembly.GetName().Version;
 
-        static readonly List<(string Argument, string Description, Action Handler)> Arguments = new List<(string Argument, string Description, Action Handler)> {
+        static readonly List<(string Argument, string Description, Action Handler)?> Arguments = new List<(string Argument, string Description, Action Handler)?> {
             ("--help", "Prints this help menu.", PrintHelp),
             ("--no-plugins", "Stops automatic plugin loading. Useful for debugging.", SetNoPlugins),
             ("--exec=\"<cmd>\"", "Executes a command immediately after successful booting.", SetAutoExec),
@@ -43,6 +43,13 @@ namespace Samarium {
         public static int Main(string[] args) {
 
             // Start by parsing arguments
+            foreach (var arg1 in args) {
+                var splitArg = arg1.Split('=')[0];
+                var argTuple = Arguments.FirstOrDefault(x => (bool)x?.Argument.StartsWith(splitArg));
+                if (argTuple is null)
+                    continue;
+                argTuple?.Handler();
+            }
 
             
 
