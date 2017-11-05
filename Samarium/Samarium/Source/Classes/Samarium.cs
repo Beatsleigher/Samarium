@@ -1,27 +1,58 @@
 ﻿using System;
 
 namespace Samarium {
-    using static global::Samarium.PluginFramework.UI.ConsoleUI;
+
     using PluginFramework;
+    using PluginFramework.Command;
+    using PluginFramework.Config;
+    using PluginFramework.Logger;
+    using PluginFramework.Plugin;
+    using PluginFramework.UI;
+    using static PluginFramework.UI.ConsoleUI;
 
     using System.Collections.Generic;
     using System.Linq;
     using System.Text;
     using System.Threading.Tasks;
-    using global::Samarium.PluginFramework.UI;
+    using System.IO;
+    using System.Reflection;
 
     public static partial class Samarium {
 
         #region Const and effectively const fields
         const string ApplicationName = nameof(Samarium);
         static readonly Version Version = typeof(Samarium).Assembly.GetName().Version;
+        static string Prompt { get; } = $"{ nameof(Samarium) } >";
 
         static readonly List<(string Argument, string Description, Action Handler)?> Arguments = new List<(string Argument, string Description, Action Handler)?> {
             ("--help", "Prints this help menu.", PrintHelp),
             ("--no-plugins", "Stops automatic plugin loading. Useful for debugging.", SetNoPlugins),
             ("--exec=\"<cmd>\"", "Executes a command immediately after successful booting.", SetAutoExec),
             ("--init", "Re-initialization \"wizard\"", () => InitWizard()),
-            ("--logdir=\"<dir>\"", "Set the logging directory for this instance.", SetLogDir)
+            ("--logdir=\"<dir>\"", "Set the logging directory for this instance.", SetLogDir),
+            ("--cnfdir=\"<dir>\"", "Set the config directory for this instance.", SetConfigDir),
+            ("--plugindir=\"<dir>\"", "Set the plugins directory for this instance.", SetPluginDir)
+        };
+
+        static readonly List<ICommand> SystemCommands = new List<ICommand> {
+            new Command {
+                Arguments = new[] { "--quiet", "--q" },
+                CommandTag = "help",
+                Description = 
+                    "Prints a list of all commands and the plugins they belong to,\n" +
+                    "along with a short description of their jobs.\n\n" +
+                    "Usage:\n" +
+                    "\thelp [arguments] [switch=setting]\n\n" +
+                    "Description:\n" +
+                    "\tArguments:\n" +
+                    "\t\t--quiet\n" +
+                    "\t\t--q\t\t\tNo console output\n" +
+                    "\tSwitches:\n" +
+                    "\t\t-plugin=\t\tOutput only commands for this plugin. Plugins may be chained.",
+                ShortDescription = "Prints a list of all commands and their parent plugins.",
+                Handler = Command_Help,
+                Switches = new Dictionary<string, string[]> { { "-plugin=", null } }
+            }
         };
         #endregion
 
@@ -37,8 +68,20 @@ namespace Samarium {
         /// </summary>
         public static List<string[]> StartupCommands { get; set; }
 
-        public static string LogDirectory { get; set; }
+        public static string LogDirectory { get; set; } = "./logs/";
+
+        public static string ConfigDirectory { get; set; } = "./.conf/";
+
+        public static string PluginsDirectory { get; set; } = "./plugins/";
+
+        public static bool KeepAlive { get; set; } = true; // Only set to false when application should terminate
         #endregion
+
+        public static IConfig SystemConfig { get; private set; }
+
+        public static Logger SystemLogger { get; private set; }
+
+        public static PluginRegistry Registry { get; private set; }
 
         public static int Main(string[] args) {
 
@@ -51,10 +94,163 @@ namespace Samarium {
                 argTuple?.Handler();
             }
 
-            
+            // Application still alive; boot.
+            InitDirectories();
 
+            // Instantiate logger
+            SystemLogger = Logger.CreateInstance(nameof(Samarium), LogDirectory);
+
+            // Begin logging from here
+            Info("Samarium is booting... please be patient...");
+            Ok("Samarium arguments...\t\thandled!");
+            Ok("Samarium configs...\t\tloaded!");
+            Ok("Samarium logger...\t\t\tinitialised!");
+
+            // Initialise plugin registry
+            Registry = PluginRegistry.CreateInstance(SystemConfig);
+            Ok("Samarium plugin registry...\tinitialised!");
+
+            Info("Loading Samarium plugins... please be patient...");
+            LoadPlugins();
+
+            try {
+
+                var inputCommand = default(string);
+
+                do {
+
+                    Console.WriteLine();
+                    PrintPrompt();
+                    inputCommand = Console.ReadLine().Trim();
+
+
+                } while (KeepAlive);
+            } catch {
+                // TERMINATE
+            }
+
+            Console.ReadKey();
             return 0;
         }
+
+        #region Init code
+        static void InitDirectories() {
+            // Start things off by initialising the config directory.
+            InitConfigDir();
+
+            // Initialise configurable directories
+            SystemConfig.SetConfig("log_directory", LogDirectory);
+            SystemConfig.SetConfig("plugin_directory", PluginsDirectory);
+
+            // Get all configs ending with "directory" and attempt to create them
+            // Directories will only be created if they do not already exist
+            foreach (var cfg in SystemConfig.Where<string>(x => x.ToLowerInvariant().EndsWith("directory")))
+                Directory.CreateDirectory(cfg);
+        }
+
+        static void InitConfigDir() {
+            var cfgFilePath = Path.Combine(ConfigDirectory, "samarium.def.yml");
+            if (!Directory.Exists(ConfigDirectory)) {
+                Directory.CreateDirectory(ConfigDirectory);
+                using (var cfgFile = File.Create(cfgFilePath))
+                using (var resourceStream = typeof(Samarium).Assembly.GetManifestResourceStream("Samarium.Resources.ConfigDefaults.samarium.yml")) { 
+                    resourceStream.CopyTo(cfgFile);
+                }
+            }
+
+            SystemConfig = new DynamicConfig(ConfigDirectory, "samarium.yml", new FileInfo(cfgFilePath));
+
+        }
+        
+        static void LoadPlugins() {
+            var ignoreList = new List<string>();
+            var includeList = new List<string>();
+
+            // Plugins to ignore
+            if (!File.Exists($"{ PluginsDirectory }/plugins.ignore"))
+                File.Create($"{ PluginsDirectory }/plugins.ignore").Close();
+            else
+                using (var fReader = new StreamReader(File.OpenRead($"{ PluginsDirectory }/plugins.ignore")))
+                    while (fReader.Peek() != -1) {
+                        var line = fReader.ReadLine();
+                        if (line.StartsWith("#", StringComparison.InvariantCulture))
+                            continue;
+                        ignoreList.Add(line);
+                    }
+
+            // Plugins to include from elsewhere
+            if (!File.Exists($"{ PluginsDirectory }/plugins.include"))
+                File.Create($"{ PluginsDirectory }/plugins.include").Close();
+            else {
+                using (var fReader = new StreamReader(File.OpenRead($"{ PluginsDirectory }/plugins.include"))) {
+                    while (fReader.Peek() != -1) {
+                        var line = fReader.ReadLine();
+                        if (line.StartsWith("#", StringComparison.InvariantCulture))
+                            continue;
+                        includeList.Add(line);
+                    }
+                }
+            }
+
+            foreach (var dll in Directory.GetFiles(PluginsDirectory, "*.dll")) {
+                if (ignoreList.Contains(dll)) continue;
+
+                var assembly = Assembly.LoadFrom(dll);
+                foreach (Type t in assembly.GetTypes()) {
+                    if (t.IsSubclassOf(typeof(Plugin))) {
+                        Registry.RegisterPlugin(assembly, t);
+                    }
+                }
+            }
+
+            if (includeList.Where(x => !string.IsNullOrEmpty(x.Trim())).Count() == 0) {
+                Warn("No plugins selected for loading! I'm essentially a virtual paperweight now.");
+                return;
+            }
+
+            foreach (var dll in includeList.Where(x => !string.IsNullOrEmpty(x.Trim()))) {
+
+                try {
+                    Info($"Loading plugin { dll }...");
+
+                    if (!File.Exists(dll)) {
+                        Error($@"The file { dll } could not be found on the local hard drive!");
+                        Error("Please make sure that the file exists and can be found by the application!");
+                        dll.Replace('\\', '/');
+                    }
+
+                    var assembly = Assembly.LoadFrom(dll);
+                    foreach (Type t in assembly.GetTypes()) {
+                        if (t.IsSubclassOf(typeof(Plugin))) {
+                            Registry.RegisterPlugin(assembly, t);
+                        }
+                    }
+                    Ok($"Plugin { dll } LOADED!");
+                } catch (Exception ex) {
+                    Error($"An error occurred while loading plugin { Path.GetFileName(dll) }!");
+                    Error($"Error message: { ex.Message }");
+                    Trace($"Error stacktrace: { ex.StackTrace }");
+                    continue;
+                }
+            }
+        }
+        #endregion
+
+        #region Logging shortcuts
+        static void Fatal(string fmt, params object[] args) => SystemLogger.Fatal(fmt, args);
+
+        static void Error(string fmt, params object[] args) => SystemLogger.Error(fmt, args);
+
+        static void Info(string fmt, params object[] args) => SystemLogger.Info(fmt, args);
+
+        static void Ok(string fmt, params object[] args) => SystemLogger.Ok(fmt, args);
+
+        static void Warn(string fmt, params object[] args) => SystemLogger.Warn(fmt, args);
+
+        static void Trace(string fmt, params object[] args) => SystemLogger.Trace(fmt, args);
+
+        static void Debug(string fmt, params object[] args) => SystemLogger.Debug(fmt, args);
+        #endregion
 
         #region Prototypes
 
@@ -63,6 +259,10 @@ namespace Samarium {
         static partial void SetLogDir();
 
         static partial void SetAutoExec();
+
+        static partial void SetConfigDir();
+
+        static partial void SetPluginDir();
         #endregion
 
         #region For a later date
@@ -85,6 +285,8 @@ namespace Samarium {
 
             PrintCentre(wipText, ConsoleWidth + boxWidth - 5, ConsoleHeight / 2 - wipText.Split('\n').Length, clearArea: false);
 
+            Console.ReadKey();
+            Environment.Exit(0x0);
         }
 
         public static int InitWizard() {

@@ -1,0 +1,34 @@
+﻿#################################################################
+##      ========== Samarium Configuration File ==========      ##
+#################################################################
+##                                                             ##
+##  This configuration file contains configurations relevant   ##
+##  to Samarium and certain core modules ONLY.                 ##
+##  This configuration file is modular and may be edited to    ##
+##  add optional functionality to Samarium if required.        ##
+##                                                             ##
+#################################################################
+##                                                             ##
+##  This configuration file is written in YAML (Yet Another    ##
+##  Markup Language) for ease of understanding and             ##
+##  configurability.                                           ##
+##  YAML uses human-friendly key-words and structure.          ##
+##                                                             ##
+##  For more information on YAML, check out this awesome       ##
+##  cheat sheet: https://gist.github.com/jonschlinkert/5170877 ##
+##                                                             ##
+#################################################################
+
+
+# [SAMARIUM]
+use_default_values: no
+log_directory: ./logs/
+plugin_directory: ./plugins/
+
+# [SAMARIUM LOGGER]
+log_to_console: yes # Disable for production
+log_to_file: yes # Recommended to keep on
+
+# [SAMARIUM REST]
+rest_base_ip: 127.0.0.1 # Change to machine's local IP; e.g. 192.168.1.1 (IPv6 is welcome, too)
+rest_listen_port: 80

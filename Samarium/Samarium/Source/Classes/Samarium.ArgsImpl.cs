@@ -30,5 +30,19 @@ namespace Samarium {
             );
         }
 
+        static partial void SetConfigDir() {
+            var tmp = Environment.GetCommandLineArgs()
+                .Where(x => x.StartsWith("--cnfdir=", StringComparison.InvariantCultureIgnoreCase))?
+                .FirstOrDefault();
+            ConfigDirectory = tmp?.Substring((int)tmp?.IndexOf('=') + 1) ?? default;
+        }
+
+        static partial void SetPluginDir() {
+            var tmp = Environment.GetCommandLineArgs()
+                .Where(x => x.StartsWith("--cnfdir=", StringComparison.InvariantCultureIgnoreCase))?
+                .FirstOrDefault();
+            PluginsDirectory = tmp?.Substring((int)tmp?.IndexOf('=') + 1) ?? default;
+        }
+
     }
 }
