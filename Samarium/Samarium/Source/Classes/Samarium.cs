@@ -16,6 +16,7 @@ namespace Samarium {
     using System.Threading.Tasks;
     using System.IO;
     using System.Reflection;
+    using System.Text.RegularExpressions;
 
     public static partial class Samarium {
 
@@ -23,6 +24,7 @@ namespace Samarium {
         const string ApplicationName = nameof(Samarium);
         static readonly Version Version = typeof(Samarium).Assembly.GetName().Version;
         static string Prompt { get; } = $"{ nameof(Samarium) } >";
+        static readonly Regex commandChainRegex = new Regex("([&]{2})", RegexOptions.Compiled);
 
         static readonly List<(string Argument, string Description, Action Handler)?> Arguments = new List<(string Argument, string Description, Action Handler)?> {
             ("--help", "Prints this help menu.", PrintHelp),
@@ -52,6 +54,30 @@ namespace Samarium {
                 ShortDescription = "Prints a list of all commands and their parent plugins.",
                 Handler = Command_Help,
                 Switches = new Dictionary<string, string[]> { { "-plugin=", null } }
+            },
+            new Command {
+                Arguments = null,
+                CommandTag = "load",
+                Description = 
+                    "Loads one or more selected plugins (*.dll/*.exe) in to Samarium.\n" +
+                    "Plugins can be loaded during runtime, as to ensure a consistent user\n" +
+                    "experience.\n\n" +
+                    "Usage:\n" +
+                    "\tload </path/to/plugin> [</path/to/another/plugin>...]\n",
+                ShortDescription = "Loads a new plugin in to Samarium.",
+                Handler = Command_LoadPlugin
+            },
+            new Command {
+                Arguments = null,
+                CommandTag = "unload",
+                Description = 
+                    "Unloads one or more plugins from Samarium.\n" +
+                    "Plugins can be unloaded during runtime, although it is not recommended!\n" +
+                    "Unloading plugins during runtime can cause application instability!\n\n" +
+                    "Usage:\n" +
+                    "\tunload <plugin_name> [<plugin_name> ...]",
+                ShortDescription = "Unloads a plugin from Samarium.",
+                Handler = Command_UnloadPlugin
             }
         };
         #endregion
@@ -108,6 +134,8 @@ namespace Samarium {
 
             // Initialise plugin registry
             Registry = PluginRegistry.CreateInstance(SystemConfig);
+            Registry.CommandExecutionRequested += Registry_CommandExecutionRequested;
+            Registry.AsyncCommandExecutionRequested += Registry_AsyncCommandExecutionRequested;
             Ok("Samarium plugin registry...\tinitialised!");
 
             Info("Loading Samarium plugins... please be patient...");
@@ -123,14 +151,52 @@ namespace Samarium {
                     PrintPrompt();
                     inputCommand = Console.ReadLine().Trim();
 
+                    //////////////////////////////////////////////////
+                    //                  Cheat Sheet                 //
+                    //////////////////////////////////////////////////
+                    //      &&      =>      Command chaining        //
+                    //      ??      =>      Asynchronous execution  //
+                    //      !!      =>      no idea                 //
+                    //////////////////////////////////////////////////
+
+                    var asyncCalls = new List<Task<ICommandResult>>();
+                    // First check for chained commands
+                    // TODO: Surround loop in try-catch
+                    foreach (var command in commandChainRegex.Split(inputCommand).Where(x => x != "&&")) {
+                        var tmp = default(string[]);
+                        // Weed out asynchronous calls
+                        if (command.StartsWith("??")) {
+                            tmp = command.TrimStart('?').SplitCommandLine().ToArray();
+                            asyncCalls.Add(ExecuteCommandAsync(tmp[0], tmp.Where(x => x != tmp[0]).ToArray()));
+                            continue;
+                        }
+
+                        tmp = command.SplitCommandLine().ToArray();
+                        ExecuteCommand(tmp[0], tmp.Where(x => x != tmp[0]).ToArray());
+
+                    }
+                    Task.WaitAll(asyncCalls.ToArray());
 
                 } while (KeepAlive);
             } catch {
                 // TERMINATE
+                // TODO
             }
 
             Console.ReadKey();
             return 0;
+        }
+
+        private static async Task<ICommandResult> Registry_AsyncCommandExecutionRequested(IPlugin sender, string requestedCommand, params string[] execArgs) {
+            return await ExecuteCommandAsync(requestedCommand, execArgs);
+        }
+
+        private static ICommandResult Registry_CommandExecutionRequested(IPlugin sender, string requestedCommand, params string[] execArgs) {
+            // Maybe at some point log which plugin requested execution?
+            // Don't know if that makes sense; but better think ahead.
+            // In any case, it's good for debugging.
+            // Yes, I could've made a one-liner, but then this comment wouldn't be a thing!
+            return ExecuteCommand(requestedCommand, execArgs);
         }
 
         #region Init code
