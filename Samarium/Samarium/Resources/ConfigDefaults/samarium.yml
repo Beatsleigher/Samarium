@@ -21,7 +21,7 @@
 
 
 # [SAMARIUM]
-use_default_values: no
+use_default_values: !!bool no
 log_directory: ./logs/
 plugin_directory: ./plugins/
 

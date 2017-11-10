@@ -2,6 +2,7 @@
 
 namespace Samarium {
 
+    using PluginFramework;
     using PluginFramework.Command;
     using PluginFramework.Plugin;
 
@@ -10,6 +11,9 @@ namespace Samarium {
     using System.Linq;
     using System.Text;
     using System.Threading.Tasks;
+    using System.IO;
+    using System.Reflection;
+    using YamlDotNet.Serialization;
 
     partial class Samarium {
 
@@ -45,6 +49,23 @@ namespace Samarium {
             var fColour = ForegroundColor;
             var loadedCommands = new List<ICommand>();
             var printToConsole = (!args.Contains("--q") && !args.Contains("--quiet"));
+
+            args = args.Where(x => x.ToLowerInvariant() != "--q" && x.ToLowerInvariant() != "--quiet").ToArray();
+
+            // Arguments should now be empty.
+            // If not, loop through them and show the help menu for specific command
+            if (args.Length > 0) {
+                var knownCommands = SystemCommands.Concat(Registry.GetAllCommands());
+
+                foreach (var tag in args) {
+                    WriteLine(
+                        "\n\t{0}", 
+                        knownCommands.FirstOrDefault(x => x.CommandTag == tag)?.Description?.Replace("\n", "\n\t") ?? 
+                        string.Format("The command {0} doesn't exist. Type \"help\" for all commands.", tag)
+                    );
+                }
+                return null; // BEWARE
+            }
 
             if (printToConsole) {
                 ForegroundColor = ConsoleColor.DarkYellow;
@@ -97,17 +118,110 @@ namespace Samarium {
         }
 
         static ICommandResult Command_LoadPlugin(IPlugin sender, ICommand command, params string[] args) {
-            throw new NotImplementedException();
+
+            var loadedPlugins = new List<string>();
+
+            foreach (var file in args) {
+                if (File.Exists(file) && (file.ToLowerInvariant().EndsWith(".exe") || file.ToLowerInvariant().EndsWith(".dll"))) {
+                    var assembly = Assembly.LoadFrom(file);
+                    foreach (var t in assembly.GetTypes()) {
+                        if (t.IsSubclassOf(typeof(IPlugin))) {
+                            Info("Attempting to load plugin {0}! Plugin name: {1}", file, t.Name);
+                            try {
+                                Registry.RegisterPlugin(assembly, t);
+                                loadedPlugins.Add(file);
+                            } catch (Exception ex) {
+                                Fatal("FAILED to load plugin {0}! Reason: {1}", file, ex.Message);
+                                Trace(ex.StackTrace);
+                            }
+                        }
+                    }
+                } else {
+                    Error("Attempted to load invalid plugin {0}!", file);
+                }
+            }
+
+            return new CommandResult<List<string>> { Message = string.Format("Loaded {0} plugins!", loadedPlugins.Count), Result = loadedPlugins };
         }
 
         static ICommandResult Command_UnloadPlugin(IPlugin sender, ICommand command, params string[] args) {
-            throw new NotImplementedException();
+            var unloadedPlugins = new Dictionary<string, bool>();
+
+            if (args.Length == 1 && args[0] == "*") {
+                args = (from plugin in Registry.PluginInstances
+                        select plugin.PluginName).ToArray();
+            }
+
+            foreach (var plugin in args) {
+                Warn("Attempting to unload plugin {0}...", plugin);
+                var instance = Registry.GetInstance(plugin.ToLowerInvariant());
+                if (instance is default) {
+                    Error("Could not locate plugin {0}!", plugin);
+                    continue;
+                }
+
+                var unloaded = Registry.RemovePlugin(instance);
+                if (!unloaded)
+                    Fatal("Could not unload plugin {0}!", plugin);
+                else
+                    Ok("Successfully unloaded plugin {0}!", plugin);
+                unloadedPlugins.Add(plugin, unloaded);
+
+            }
+
+            return new CommandResult<Dictionary<string, bool>> {
+                Message = $"Successfully unloaded { unloadedPlugins.Where(x => x.Value).Count() } plugins!",
+                Result = unloadedPlugins
+            };
         }
 
         static ICommandResult Command_PrintPrompt(IPlugin sender, ICommand command, params string[] args) {
             PrintPrompt();
             //return ComandResult.Empty; TODO
             return null;
+        }
+
+        static ICommandResult Command_Config(IPlugin sender, ICommand command, params string[] args) {
+
+            command.SortArgs(out _, out var arguments, out _, args);
+
+            foreach (var arg in arguments) {
+                switch (arg) {
+                    case "--list":
+                        Output(SystemConfig.ToString(ConfigSerializationType.Yaml));
+                        return default; // No point in returning anything here. System configs are available system-wide.
+                    case "--load":
+                        SystemConfig.LoadConfigs();
+                        return default; // Again, no point here. Events will be called accordingly.
+                    case "--save":
+                        SystemConfig.SaveConfigs();
+                        return default;
+                    case "--load-defaults":
+                        SystemConfig.LoadDefaults();
+                        return default;
+                    default:
+                        if (arg.StartsWith("--set")) {
+                            foreach (var cfg in arg.Split(' ').Where(x => x != "--set")) {
+                                var split = cfg.Split(new[] { '=' }, 2);
+                                if (!SystemConfig.HasKey(split[0])) {
+                                    Warn("Adding new configuration to Samarium...");
+                                    var pseudoYaml = string.Join(": ", split);
+                                    var kvPair = new DeserializerBuilder().Build().Deserialize<Dictionary<string, object>>(pseudoYaml);
+                                    Info("New configuration has following properties: name: {0}\tvalue: {1}", kvPair.First().Key, kvPair.First().Value);
+                                    SystemConfig.SetConfig(kvPair.First().Key, kvPair.First().Value);
+                                }
+                            }
+                        }
+                        if (arg.StartsWith("--list")) {
+                            Output(SystemConfig.Where<object>(x => x.Contains(arg.Split(' ')[1])).Serialize());
+                        }
+                        break;
+                }
+            }
+
+            throw new NotImplementedException();
+
+            void Output(string serializedData) => WriteLine("Current Samarium configuration:\n{0}", serializedData);
         }
 
         static void PrintPrompt() {

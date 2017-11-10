@@ -40,7 +40,7 @@ namespace Samarium {
             new Command {
                 Arguments = new[] { "--quiet", "--q" },
                 CommandTag = "help",
-                Description = 
+                Description =
                     "Prints a list of all commands and the plugins they belong to,\n" +
                     "along with a short description of their jobs.\n\n" +
                     "Usage:\n" +
@@ -58,7 +58,7 @@ namespace Samarium {
             new Command {
                 Arguments = null,
                 CommandTag = "load",
-                Description = 
+                Description =
                     "Loads one or more selected plugins (*.dll/*.exe) in to Samarium.\n" +
                     "Plugins can be loaded during runtime, as to ensure a consistent user\n" +
                     "experience.\n\n" +
@@ -70,7 +70,7 @@ namespace Samarium {
             new Command {
                 Arguments = null,
                 CommandTag = "unload",
-                Description = 
+                Description =
                     "Unloads one or more plugins from Samarium.\n" +
                     "Plugins can be unloaded during runtime, although it is not recommended!\n" +
                     "Unloading plugins during runtime can cause application instability!\n\n" +
@@ -78,6 +78,36 @@ namespace Samarium {
                     "\tunload <plugin_name> [<plugin_name> ...]",
                 ShortDescription = "Unloads a plugin from Samarium.",
                 Handler = Command_UnloadPlugin
+            },
+            new Command {
+                CommandTag = "exit",
+                Description =
+                    "Disrupts the looper and causes the application to\n" +
+                    "terminate in a controlled fashion.",
+                Handler = (plugin, command, args) => { KeepAlive = false; return null; },
+            },
+            new Command {
+                Arguments = new[] { "--load", "--save", "--load-defaults", "--get", "--set", "--list" },
+                CommandTag = "config",
+                Description = 
+                    "Allows for basic configuration management.\n" +
+                    "Using this command, configurations can be retrieved and set\n" +
+                    "while the application is running.\n" +
+                    "Generally new configurations are available and usable system-wide.\n" +
+                    "This may vary depending on the loaded plugins and their respective\n" +
+                    "configurations.\n\n" +
+                    "Usage:\n" +
+                    "\tconfig <argument>\n" +
+                    "\tconfig <\"--set key=newvalue\">\n" +
+                    "\tconfig <[--list] [\"--list filter\"]>\n\n" +
+                    "Description:\n" +
+                    "\tArguments:\n" +
+                    "\t\t--load\t\t\tReload the configurations from the config file.\n" +
+                    "\t\t--save\t\t\tSave the current configuration to the config file.\n" +
+                    "\t\t--load-defaults\t\tLoad the default configurations.\n" +
+                    "\t\t--get\t\t\tGet a specific configuration",
+                Handler = Command_Config,
+                ShortDescription = "Basic config management."
             }
         };
         #endregion
@@ -151,6 +181,9 @@ namespace Samarium {
                     PrintPrompt();
                     inputCommand = Console.ReadLine().Trim();
 
+                    if (string.IsNullOrEmpty(inputCommand))
+                        continue;
+
                     //////////////////////////////////////////////////
                     //                  Cheat Sheet                 //
                     //////////////////////////////////////////////////
@@ -178,12 +211,18 @@ namespace Samarium {
                     Task.WaitAll(asyncCalls.ToArray());
 
                 } while (KeepAlive);
-            } catch {
+            } catch (Exception ex) {
                 // TERMINATE
-                // TODO
+                Fatal("A fatal error occurred within Samarium!");
+                Fatal("Error message: {0}", ex.Message);
+                Trace("Error source: {0}", ex.Source);
+                Trace("Error stacktrace: {0}", ex.StackTrace);
+                Fatal("This error has forced Samarium to abort! I will attempt to cleanly shut down all plugins!");
+            } finally {
+                // UNLOAD PLUGINS
+                ExecuteCommand("unload", "*");
             }
 
-            Console.ReadKey();
             return 0;
         }
 
@@ -228,7 +267,7 @@ namespace Samarium {
 
         }
         
-        static void LoadPlugins() {
+        static async void LoadPlugins() {
             var ignoreList = new List<string>();
             var includeList = new List<string>();
 
@@ -258,47 +297,16 @@ namespace Samarium {
                 }
             }
 
-            foreach (var dll in Directory.GetFiles(PluginsDirectory, "*.dll")) {
-                if (ignoreList.Contains(dll)) continue;
+            var initialResults = await ExecuteCommandAsync("load", Directory.GetFiles(PluginsDirectory, "*.dll")
+                .Where(x => !ignoreList.Contains(x)).ToArray());
 
-                var assembly = Assembly.LoadFrom(dll);
-                foreach (Type t in assembly.GetTypes()) {
-                    if (t.IsSubclassOf(typeof(Plugin))) {
-                        Registry.RegisterPlugin(assembly, t);
-                    }
-                }
-            }
-
-            if (includeList.Where(x => !string.IsNullOrEmpty(x.Trim())).Count() == 0) {
+            if (includeList.Where(x => !string.IsNullOrEmpty(x.Trim())).Count() == 0 && ((dynamic)initialResults).Result.Count == 0) {
                 Warn("No plugins selected for loading! I'm essentially a virtual paperweight now.");
                 return;
             }
 
-            foreach (var dll in includeList.Where(x => !string.IsNullOrEmpty(x.Trim()))) {
-
-                try {
-                    Info($"Loading plugin { dll }...");
-
-                    if (!File.Exists(dll)) {
-                        Error($@"The file { dll } could not be found on the local hard drive!");
-                        Error("Please make sure that the file exists and can be found by the application!");
-                        dll.Replace('\\', '/');
-                    }
-
-                    var assembly = Assembly.LoadFrom(dll);
-                    foreach (Type t in assembly.GetTypes()) {
-                        if (t.IsSubclassOf(typeof(Plugin))) {
-                            Registry.RegisterPlugin(assembly, t);
-                        }
-                    }
-                    Ok($"Plugin { dll } LOADED!");
-                } catch (Exception ex) {
-                    Error($"An error occurred while loading plugin { Path.GetFileName(dll) }!");
-                    Error($"Error message: { ex.Message }");
-                    Trace($"Error stacktrace: { ex.StackTrace }");
-                    continue;
-                }
-            }
+            var includeListResults = await ExecuteCommandAsync("load", includeList.Where(x => !string.IsNullOrEmpty(x.Trim()))
+                                                                                  .Where(File.Exists).ToArray());
         }
         #endregion
 
