@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26730.16
+VisualStudioVersion = 15.0.27004.2008
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Samarium", "Samarium\Samarium.csproj", "{D9136ADB-CB41-4AF5-8C13-96C84336BE11}"
 EndProject
@@ -10,6 +10,8 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Plugins", "Plugins", "{53B05460-33E8-48AE-84E0-99EDE5903939}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Samarium.PluginFramework", "..\Samarium-PluginFramework\Samarium.PluginFramework\Samarium.PluginFramework.csproj", "{02F9F999-2883-45D7-BA27-9A37725AEE8B}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "third-party", "third-party", "{F2EF75EA-320B-4E10-94A5-F526727AF8A7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

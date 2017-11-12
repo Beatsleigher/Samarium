@@ -22,9 +22,10 @@ namespace Samarium {
 
         #region Const and effectively const fields
         const string ApplicationName = nameof(Samarium);
-        static readonly Version Version = typeof(Samarium).Assembly.GetName().Version;
+        static Version Version { get; } = typeof(Samarium).Assembly.GetName().Version;
         static string Prompt { get; } = $"{ nameof(Samarium) } >";
-        static readonly Regex commandChainRegex = new Regex("([&]{2})", RegexOptions.Compiled);
+        static Regex commandChainRegex { get; } = new Regex("([&]{2})", RegexOptions.Compiled);
+        static string ApplicationCopyright { get; } = $"{ ApplicationName } © Simon Cahill & contributors";
 
         static readonly List<(string Argument, string Description, Action Handler)?> Arguments = new List<(string Argument, string Description, Action Handler)?> {
             ("--help", "Prints this help menu.", PrintHelp),
@@ -85,6 +86,7 @@ namespace Samarium {
                     "Disrupts the looper and causes the application to\n" +
                     "terminate in a controlled fashion.",
                 Handler = (plugin, command, args) => { KeepAlive = false; return null; },
+                ShortDescription = "Terminates Samarium in a controller manor."
             },
             new Command {
                 Arguments = new[] { "--load", "--save", "--load-defaults", "--get", "--set", "--list" },
@@ -108,6 +110,12 @@ namespace Samarium {
                     "\t\t--get\t\t\tGet a specific configuration",
                 Handler = Command_Config,
                 ShortDescription = "Basic config management."
+            },
+            new Command {
+                CommandTag = "clear",
+                Description = "Clears the console.",
+                Handler = (plugin, cmd, args) => { Console.Clear(); PrintTopTitle(ApplicationCopyright, Version.ToString()); return default; },
+                ShortDescription = "Clears the console."
             }
         };
         #endregion
@@ -187,28 +195,38 @@ namespace Samarium {
                     //////////////////////////////////////////////////
                     //                  Cheat Sheet                 //
                     //////////////////////////////////////////////////
+                    //                                              //
                     //      &&      =>      Command chaining        //
                     //      ??      =>      Asynchronous execution  //
                     //      !!      =>      no idea                 //
+                    //      ""      =>      multiple args in one    //
+                    //                                              //
                     //////////////////////////////////////////////////
 
                     var asyncCalls = new List<Task<ICommandResult>>();
                     // First check for chained commands
-                    // TODO: Surround loop in try-catch
-                    foreach (var command in commandChainRegex.Split(inputCommand).Where(x => x != "&&")) {
-                        var tmp = default(string[]);
-                        // Weed out asynchronous calls
-                        if (command.StartsWith("??")) {
-                            tmp = command.TrimStart('?').SplitCommandLine().ToArray();
-                            asyncCalls.Add(ExecuteCommandAsync(tmp[0], tmp.Where(x => x != tmp[0]).ToArray()));
-                            continue;
+                    try {
+                        foreach (var command in commandChainRegex.Split(inputCommand).Where(x => x != "&&")) {
+                            var tmp = default(string[]);
+                            // Weed out asynchronous calls
+                            if (command.StartsWith("??")) {
+                                tmp = command.TrimStart('?').SplitCommandLine().ToArray();
+                                asyncCalls.Add(ExecuteCommandAsync(tmp[0], tmp.Where(x => x != tmp[0]).ToArray()));
+                                continue;
+                            }
+
+                            tmp = command.SplitCommandLine().ToArray();
+                            ExecuteCommand(tmp[0], tmp.Where(x => x != tmp[0]).ToArray());
+
                         }
-
-                        tmp = command.SplitCommandLine().ToArray();
-                        ExecuteCommand(tmp[0], tmp.Where(x => x != tmp[0]).ToArray());
-
+                        Task.WaitAll(asyncCalls.ToArray());
+                    } catch (Exception ex) {
+                        Error("An error occurred while executing the command {0}!", inputCommand);
+                        Error("Error description: {0}", ex.Message);
+                        Trace("Error source: {0}", ex.Source);
+                        Trace("Error stacktrace: {0}", ex.StackTrace);
+                        Error("If this error persists, please contact your vendor or submit an issue on GitHub!");
                     }
-                    Task.WaitAll(asyncCalls.ToArray());
 
                 } while (KeepAlive);
             } catch (Exception ex) {
@@ -267,7 +285,7 @@ namespace Samarium {
 
         }
         
-        static async void LoadPlugins() {
+        static void LoadPlugins() {
             var ignoreList = new List<string>();
             var includeList = new List<string>();
 
@@ -297,7 +315,7 @@ namespace Samarium {
                 }
             }
 
-            var initialResults = await ExecuteCommandAsync("load", Directory.GetFiles(PluginsDirectory, "*.dll")
+            var initialResults = ExecuteCommand("load", Directory.GetFiles(PluginsDirectory, "*.dll")
                 .Where(x => !ignoreList.Contains(x)).ToArray());
 
             if (includeList.Where(x => !string.IsNullOrEmpty(x.Trim())).Count() == 0 && ((dynamic)initialResults).Result.Count == 0) {
@@ -305,7 +323,7 @@ namespace Samarium {
                 return;
             }
 
-            var includeListResults = await ExecuteCommandAsync("load", includeList.Where(x => !string.IsNullOrEmpty(x.Trim()))
+            var includeListResults = ExecuteCommand("load", includeList.Where(x => !string.IsNullOrEmpty(x.Trim()))
                                                                                   .Where(File.Exists).ToArray());
         }
         #endregion

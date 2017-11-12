@@ -26,9 +26,10 @@ log_directory: ./logs/
 plugin_directory: ./plugins/
 
 # [SAMARIUM LOGGER]
-log_to_console: yes # Disable for production
-log_to_file: yes # Recommended to keep on
+log_to_console: !!bool yes # Disable for production
+log_to_file: !!bool yes # Recommended to keep on
 
 # [SAMARIUM REST]
 rest_base_ip: 127.0.0.1 # Change to machine's local IP; e.g. 192.168.1.1 (IPv6 is welcome, too)
 rest_listen_port: 80
+rest_route_prefix: ""

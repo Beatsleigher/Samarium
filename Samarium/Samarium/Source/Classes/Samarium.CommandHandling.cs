@@ -186,7 +186,8 @@ namespace Samarium {
             command.SortArgs(out _, out var arguments, out _, args);
 
             foreach (var arg in arguments) {
-                switch (arg) {
+                var trimmedArg = arg.Trim();
+                switch (trimmedArg) {
                     case "--list":
                         Output(SystemConfig.ToString(ConfigSerializationType.Yaml));
                         return default; // No point in returning anything here. System configs are available system-wide.
@@ -207,19 +208,23 @@ namespace Samarium {
                                     Warn("Adding new configuration to Samarium...");
                                     var pseudoYaml = string.Join(": ", split);
                                     var kvPair = new DeserializerBuilder().Build().Deserialize<Dictionary<string, object>>(pseudoYaml);
-                                    Info("New configuration has following properties: name: {0}\tvalue: {1}", kvPair.First().Key, kvPair.First().Value);
+                                    Info(
+                                        "New configuration has following properties:\n\tname: {0}\n\tvalue: {1}\n\ttype: {2}", 
+                                        kvPair.First().Key, kvPair.First().Value, kvPair.First().Value.GetType().Name
+                                    );
                                     SystemConfig.SetConfig(kvPair.First().Key, kvPair.First().Value);
+                                    Ok("Added new configuration \"{0}\" to Samarium!", kvPair.First().Key);
                                 }
                             }
                         }
-                        if (arg.StartsWith("--list")) {
-                            Output(SystemConfig.Where<object>(x => x.Contains(arg.Split(' ')[1])).Serialize());
+                        if (trimmedArg.StartsWith("--list")) {
+                            Output(SystemConfig.Where<object>(x => x.Contains(trimmedArg.Split(' ')[1])).Serialize());
                         }
                         break;
                 }
             }
 
-            throw new NotImplementedException();
+            return default;
 
             void Output(string serializedData) => WriteLine("Current Samarium configuration:\n{0}", serializedData);
         }
