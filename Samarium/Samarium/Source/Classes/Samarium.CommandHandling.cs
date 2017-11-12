@@ -125,7 +125,7 @@ namespace Samarium {
                 if (File.Exists(file) && (file.ToLowerInvariant().EndsWith(".exe") || file.ToLowerInvariant().EndsWith(".dll"))) {
                     var assembly = Assembly.LoadFrom(file);
                     foreach (var t in assembly.GetTypes()) {
-                        if (t.IsSubclassOf(typeof(IPlugin))) {
+                        if (t.IsSubclassOf(typeof(IPlugin)) || t.IsSubclassOf(typeof(Plugin))) {
                             Info("Attempting to load plugin {0}! Plugin name: {1}", file, t.Name);
                             try {
                                 Registry.RegisterPlugin(assembly, t);

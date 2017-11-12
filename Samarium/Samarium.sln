@@ -13,6 +13,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Samarium.PluginFramework", 
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "third-party", "third-party", "{F2EF75EA-320B-4E10-94A5-F526727AF8A7}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{900C2126-BD0C-4036-BAE3-E06E6DDB737E}"
+EndProject
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "SampleVBPlugin", "..\Samarium-Samples\SampleVBPlugin\SampleVBPlugin.vbproj", "{DB28A8B9-B5CC-4136-BBE5-C7E51D6FEBAE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +31,10 @@ Global
 		{02F9F999-2883-45D7-BA27-9A37725AEE8B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{02F9F999-2883-45D7-BA27-9A37725AEE8B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{02F9F999-2883-45D7-BA27-9A37725AEE8B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DB28A8B9-B5CC-4136-BBE5-C7E51D6FEBAE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DB28A8B9-B5CC-4136-BBE5-C7E51D6FEBAE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DB28A8B9-B5CC-4136-BBE5-C7E51D6FEBAE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DB28A8B9-B5CC-4136-BBE5-C7E51D6FEBAE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -34,6 +42,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{D9136ADB-CB41-4AF5-8C13-96C84336BE11} = {F5EE0152-B8D6-4EC2-944A-7218ADC9B4A4}
 		{02F9F999-2883-45D7-BA27-9A37725AEE8B} = {F5EE0152-B8D6-4EC2-944A-7218ADC9B4A4}
+		{DB28A8B9-B5CC-4136-BBE5-C7E51D6FEBAE} = {900C2126-BD0C-4036-BAE3-E06E6DDB737E}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {D81F2AB5-1C8D-4D83-9204-052E89BE0A4D}
