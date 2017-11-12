@@ -7,3 +7,6 @@
 [submodule "Samarium-Mobile"]
 	path = Samarium-Mobile
 	url = https://github.com/Beatsleigher/Samarium-Mobile.git
+[submodule "Samarium-Samples"]
+	path = Samarium-Samples
+	url = https://github.com/Beatsleigher/Samarium-Samples.git
