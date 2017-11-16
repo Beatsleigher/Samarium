@@ -1,0 +1,70 @@
+﻿//#################################################################
+//##      ========== Samarium Configuration File ==========      ##
+//#################################################################
+//##                                                             ##
+//##  This configuration file contains configurations relevant   ##
+//##  to Samarium and certain core modules ONLY.                 ##
+//##  This configuration file is modular and may be edited to    ##
+//##  add optional functionality to Samarium if required.        ##
+//##                                                             ##
+//#################################################################
+//##                                                             ##
+//##  This configuration file is written in JSON (JavaScript     ##
+//##  Object Notation).                                          ##
+//##                                                             ##
+//##  For more information on JSON, check out http://json.org/   ##
+//##                                                             ##
+//#################################################################
+
+// CONFIG START
+{
+
+  //# [SAMARIUM]
+  "use_default_values": false,
+  "log_directory": "./logs/",
+  "plugin_directory": "./plugins/",
+
+  //# [SAMARIUM LOGGER]
+  "log_to_console": true,
+  "log_to_file": true,
+  "truncate_logs": true, // Set to false to append new logs to old files. Files larger than 1GiB or older than 7 days will be truncated automatically!
+
+  //# [SAMARIUM REST]
+  "rest_base_ip": "127.0.0.1", // change to machine's local IP; e.g.: 192.168.1.1 (IPv6 is welcome, too)
+  "rest_listen_port": 80,
+  "rest_route_prefix": "",
+
+  //# [ELASTICSEARCH COMMS]
+  "es_cfg": {
+    "PoolType": 2,
+    "KnownNodes": [
+      "http://localhost:9200"
+    ],
+    "RandomizeNodes": true,
+    "ConnectionLimit": 50,
+    "DeadTimeout": "00:01:00",
+    "DefaultIndex": "Samarium",
+    "EnableDebugMode": false,
+    "EnableHttpCompression": false,
+    "EnableHttpPipelining": false,
+    "EnableTcpKeepAlive": true,
+    "KeepAliveDuration": "00:05:00",
+    "KeepAliveInterval": "00:10:00",
+    "MaximumRetries": 3,
+    "MaximumRetryTimeout": "00:00:30",
+    "PingTimeout": "00:00:15",
+    "PrettifyJson": false,
+    "UseProxy": false,
+    "ProxyAddress": null,
+    "ProxyUsername": null,
+    "ProxyPassword": null,
+    "RequestTimeout": "00:00:30",
+    "SniffLifeSpan": "00:45:00",
+    "SniffOnConnectionFault": true,
+    "SniffOnStartup": true,
+    "ThrowExceptions": true
+  }
+
+}
+// CONFIG END
+

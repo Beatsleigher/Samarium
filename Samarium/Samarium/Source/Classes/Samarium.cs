@@ -7,6 +7,7 @@ namespace Samarium {
     using PluginFramework.Config;
     using PluginFramework.Logger;
     using PluginFramework.Plugin;
+    using PluginFramework.Rest;
     using PluginFramework.UI;
     using static PluginFramework.UI.ConsoleUI;
 
@@ -17,6 +18,9 @@ namespace Samarium {
     using System.IO;
     using System.Reflection;
     using System.Text.RegularExpressions;
+    using System.Net;
+    using System.Threading;
+    using Newtonsoft.Json;
 
     public static partial class Samarium {
 
@@ -37,7 +41,7 @@ namespace Samarium {
             ("--plugindir=\"<dir>\"", "Set the plugins directory for this instance.", SetPluginDir)
         };
 
-        static readonly List<ICommand> SystemCommands = new List<ICommand> {
+        static List<ICommand> SystemCommands { get; } = new List<ICommand> {
             new Command {
                 Arguments = new[] { "--quiet", "--q" },
                 CommandTag = "help",
@@ -91,7 +95,7 @@ namespace Samarium {
             new Command {
                 Arguments = new[] { "--load", "--save", "--load-defaults", "--get", "--set", "--list" },
                 CommandTag = "config",
-                Description = 
+                Description =
                     "Allows for basic configuration management.\n" +
                     "Using this command, configurations can be retrieved and set\n" +
                     "while the application is running.\n" +
@@ -116,6 +120,21 @@ namespace Samarium {
                 Description = "Clears the console.",
                 Handler = (plugin, cmd, args) => { Console.Clear(); PrintTopTitle(ApplicationCopyright, Version.ToString()); return default; },
                 ShortDescription = "Clears the console."
+            },
+            new Command {
+                Arguments = new[] { "--all-plugins", "--loaded-plugins", "--ignored-plugins" },
+                CommandTag = "list",
+                Description = 
+                    "Lists the desired information in the console.\n\n" +
+                    "Usage:\n" +
+                    "\tlist <argument>\n\n" +
+                    "Description:\n" +
+                    "\tArguments:\n" +
+                    "\t\t--all-plugins\t\t\tList all plugins known to Samarium.\n" +
+                    "\t\t--loaded-plugins\t\tList all plugins loaded in to memory.\n" +
+                    "\t\t--ignored-plugins\t\tList all plugins ignored by Samarium on startup.\n",
+                Handler = Command_List,
+                ShortDescription = "Lists the desired information"                
             }
         };
         #endregion
@@ -147,6 +166,8 @@ namespace Samarium {
 
         public static PluginRegistry Registry { get; private set; }
 
+        public static RestService RestService { get; private set; }
+
         public static int Main(string[] args) {
 
             // Start by parsing arguments
@@ -160,9 +181,10 @@ namespace Samarium {
 
             // Application still alive; boot.
             InitDirectories();
+            InitConsole();
 
             // Instantiate logger
-            SystemLogger = Logger.CreateInstance(nameof(Samarium), LogDirectory);
+            SystemLogger = Logger.CreateInstance(nameof(Samarium), LogDirectory).SetConfig(SystemConfig);
 
             // Begin logging from here
             Info("Samarium is booting... please be patient...");
@@ -176,18 +198,31 @@ namespace Samarium {
             Registry.AsyncCommandExecutionRequested += Registry_AsyncCommandExecutionRequested;
             Ok("Samarium plugin registry...\tinitialised!");
 
+            // Initialise REST service
+            Info("Initialising RESTful services... please be patient...");
+            //RestService = RestService.CreateInstance(IPAddress.Parse(SystemConfig.GetString("rest_base_ip")));
+
             Info("Loading Samarium plugins... please be patient...");
             LoadPlugins();
 
+            Info("Processing hooks...");
+            Console.CancelKeyPress += (s, evt) => { evt.Cancel = true; };
+            Console.CancelKeyPress += Console_CancelKeyPress;
+
+            Ok("Samarium has successfully booted!");
+            Thread.Sleep(500);
+            ExecuteCommand("clear");
             try {
 
                 var inputCommand = default(string);
 
                 do {
 
-                    Console.WriteLine();
-                    PrintPrompt();
-                    inputCommand = Console.ReadLine().Trim();
+                    try {
+                        Console.WriteLine();
+                        PrintPrompt();
+                        inputCommand = Console.ReadLine()?.Trim();
+                    } catch { continue; }
 
                     if (string.IsNullOrEmpty(inputCommand))
                         continue;
@@ -244,6 +279,12 @@ namespace Samarium {
             return 0;
         }
 
+        private static void Console_CancelKeyPress(object sender, ConsoleCancelEventArgs e) {
+            e.Cancel = false;
+            Warn("Attempted to terminate application with CTRL+C!");
+            Warn("Application cannot be terminated this way; to cleanly exit the application, type \"exit\"");
+        }
+
         private static async Task<ICommandResult> Registry_AsyncCommandExecutionRequested(IPlugin sender, string requestedCommand, params string[] execArgs) {
             return await ExecuteCommandAsync(requestedCommand, execArgs);
         }
@@ -272,6 +313,7 @@ namespace Samarium {
         }
 
         static void InitConfigDir() {
+#if USE_YAMLDOTNET
             var cfgFilePath = Path.Combine(ConfigDirectory, "samarium.def.yml");
             if (!Directory.Exists(ConfigDirectory)) {
                 Directory.CreateDirectory(ConfigDirectory);
@@ -282,6 +324,18 @@ namespace Samarium {
             }
 
             SystemConfig = new DynamicConfig(ConfigDirectory, "samarium.yml", new FileInfo(cfgFilePath));
+#else
+            var cfgFilePath = Path.Combine(ConfigDirectory, "samarium.def.json");
+            if (!Directory.Exists(ConfigDirectory) || !File.Exists(cfgFilePath)) {
+                Directory.CreateDirectory(ConfigDirectory);
+                using (var cfgFile = File.Create(cfgFilePath))
+                using (var resourceStream = typeof(Samarium).Assembly.GetManifestResourceStream("Samarium.Resources.ConfigDefaults.samarium.json")) {
+                    resourceStream.CopyTo(cfgFile);
+                }
+            }
+
+            SystemConfig = new DynamicConfig(ConfigDirectory, "samarium.json", new FileInfo(cfgFilePath));
+#endif
 
         }
         
@@ -310,7 +364,7 @@ namespace Samarium {
                         var line = fReader.ReadLine();
                         if (line.StartsWith("#", StringComparison.InvariantCulture))
                             continue;
-                        includeList.Add(line);
+                        includeList.Add(line.Replace("$(plugin_dir)", PluginsDirectory));
                     }
                 }
             }
@@ -325,6 +379,11 @@ namespace Samarium {
 
             var includeListResults = ExecuteCommand("load", includeList.Where(x => !string.IsNullOrEmpty(x.Trim()))
                                                                                   .Where(File.Exists).ToArray());
+        }
+        
+        static void InitConsole() {
+            var spaces = new[] { " ", " ", " ", " ", " ", " ", " ", " ", " " };
+            Console.Title = string.Format("{0} {1} Version {2}", ApplicationCopyright, string.Join("", spaces), Version);
         }
         #endregion
 

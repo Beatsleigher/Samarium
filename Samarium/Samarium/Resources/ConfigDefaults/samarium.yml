@@ -33,3 +33,43 @@ log_to_file: !!bool yes # Recommended to keep on
 rest_base_ip: 127.0.0.1 # Change to machine's local IP; e.g. 192.168.1.1 (IPv6 is welcome, too)
 rest_listen_port: 80
 rest_route_prefix: ""
+
+# [ELASTICSEARCH]
+es_cfg:
+    PoolType: SniffingPool
+    KnownNodes:
+    - AbsolutePath: /
+      AbsoluteUri: http://localhost:9200/
+      LocalPath: /
+      Authority: localhost:9200
+      HostNameType: Dns
+      IsLoopback: true
+      PathAndQuery: /
+      Segments:
+      - /
+      Host: localhost
+      Port: 9200
+      Query: ''
+      Fragment: ''
+      Scheme: http
+      OriginalString: http://localhost:9200
+      DnsSafeHost: localhost
+      IdnHost: localhost
+      IsAbsoluteUri: true
+      UserInfo: ''
+    RandomizeNodes: true
+    ConnectionLimit: 50
+    DeadTimeout: 00:01:00
+    DefaultIndex: Samarium
+    EnableTcpKeepAlive: true
+    KeepAliveDuration: 00:05:00
+    KeepAliveInterval: 00:10:00
+    MaximumRetries: 3
+    MaximumRetryTimeout: 00:00:30
+    PingTimeout: 00:00:15
+    RequestTimeout: 00:00:30
+    SniffLifeSpan: 00:45:00
+    SniffOnConnectionFault: true
+    SniffOnStartup: true
+    ThrowExceptions: true
+

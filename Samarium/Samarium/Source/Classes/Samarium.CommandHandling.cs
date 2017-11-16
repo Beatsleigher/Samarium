@@ -20,7 +20,7 @@ namespace Samarium {
         static ICommandResult ExecuteCommand(string commandTag, params string[] args) {
             // Check for Samarium commands first.
             // If default, check in plugins.
-            var command = SystemCommands.FirstOrDefault(x => x.CommandTag == commandTag) ?? 
+            var command = SystemCommands.FirstOrDefault(x => x.CommandTag == commandTag) ??
                           Registry.PluginInstances.FirstOrDefault(plugin => plugin.HasCommand(commandTag))?.GetCommand(commandTag);
 
             if (command is default) {
@@ -59,8 +59,8 @@ namespace Samarium {
 
                 foreach (var tag in args) {
                     WriteLine(
-                        "\n\t{0}", 
-                        knownCommands.FirstOrDefault(x => x.CommandTag == tag)?.Description?.Replace("\n", "\n\t") ?? 
+                        "\n\t{0}",
+                        knownCommands.FirstOrDefault(x => x.CommandTag == tag)?.Description?.Replace("\n", "\n\t") ??
                         string.Format("The command {0} doesn't exist. Type \"help\" for all commands.", tag)
                     );
                 }
@@ -97,19 +97,19 @@ namespace Samarium {
 
                 if (printToConsole) {
                     foreach (var command in pluginClass.PluginCommands.Where(x => (x != null && !string.IsNullOrEmpty(x.CommandTag)))) {
-                        Write("\t{0,-25}\t{1,-130}", command.CommandTag, command.ShortDescription);
+                        Write("\t{0,-30}\t{1,-65}", command.CommandTag, command.ShortDescription);
 
                         ForegroundColor = ConsoleColor.DarkYellow;
-                        Write("{0,-2}", "[");
+                        Write("{0,-3}", " [");
                         ForegroundColor = ConsoleColor.Cyan;
-                        Write("{0,-" + pluginClass.PluginName.Length + "}", pluginClass.PluginName);
+                        Write($"{{0,-{ pluginClass.PluginName.Length }}}", pluginClass.PluginName);
                         ForegroundColor = ConsoleColor.DarkYellow;
                         WriteLine("{0,2}", "]");
                         ForegroundColor = fColour;
                     }
                     WriteLine();
                 }
-                    
+
             }
             if (printToConsole)
                 WriteLine("To find out more about a command, type help <command>...");
@@ -209,7 +209,7 @@ namespace Samarium {
                                     var pseudoYaml = string.Join(": ", split);
                                     var kvPair = new DeserializerBuilder().Build().Deserialize<Dictionary<string, object>>(pseudoYaml);
                                     Info(
-                                        "New configuration has following properties:\n\tname: {0}\n\tvalue: {1}\n\ttype: {2}", 
+                                        "New configuration has following properties:\n\tname: {0}\n\tvalue: {1}\n\ttype: {2}",
                                         kvPair.First().Key, kvPair.First().Value, kvPair.First().Value.GetType().Name
                                     );
                                     SystemConfig.SetConfig(kvPair.First().Key, kvPair.First().Value);
@@ -227,6 +227,46 @@ namespace Samarium {
             return default;
 
             void Output(string serializedData) => WriteLine("Current Samarium configuration:\n{0}", serializedData);
+        }
+
+        static ICommandResult Command_List(IPlugin sender, ICommand command, params string[] args) {
+
+            command.SortArgs(out _, out var arguments, out _, args);
+
+            foreach (var arg in arguments) {
+                switch (arg.ToLowerInvariant()) {
+                    case "--all-plugins": {
+                            var plugins = GetAllPlugins();
+                            WriteLine("All known plugins:");
+                            plugins.ForEach(x => WriteLine("\t{0}", x));
+                            return new CommandResult<List<string>>("Listing all known plugins", plugins);
+                        }
+                    case "--loaded-plugins": {
+                            var plugins = Registry.PluginInstances;
+                            WriteLine("Loaded plugins:");
+                            foreach (var plugin in plugins)
+                                WriteLine("\t{0}", plugin.PluginName);
+                            WriteLine("Total count: {0}", plugins.Count);
+                            return new CommandResult<List<IPlugin>>("Listing all loaded plugins", plugins);
+                        }
+                    case "--ignored-plugins": {
+                            var plugins = File.ReadLines($"{ PluginsDirectory }/plugins.ignore").ToList();
+                            WriteLine("All ignored plugins:");
+                            plugins.ForEach(x => WriteLine("\t{0}", x));
+                            return new CommandResult<List<string>>("Listing all ignored plugins", plugins);
+                        }
+                }
+            }
+
+            return default;
+
+        }
+
+        static List<string> GetAllPlugins() {
+            var plugins = new List<string>(File.ReadLines($"{ PluginsDirectory }/plugins.ignore"));
+            plugins.AddRange(File.ReadLines($"{ PluginsDirectory }/plugins.include"));
+
+            return plugins;
         }
 
         static void PrintPrompt() {
