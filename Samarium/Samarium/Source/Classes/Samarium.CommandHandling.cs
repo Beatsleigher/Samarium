@@ -23,7 +23,7 @@ namespace Samarium {
             var command = SystemCommands.FirstOrDefault(x => x.CommandTag == commandTag) ??
                           Registry.PluginInstances.FirstOrDefault(plugin => plugin.HasCommand(commandTag))?.GetCommand(commandTag);
 
-            if (command is default) {
+            if (command is default(ICommand)) {
                 Error("Attempted to execute command {0} with params {1}; command was not found!", commandTag, string.Join(", ", args));
                 return default;
             }
@@ -37,7 +37,7 @@ namespace Samarium {
             var command = SystemCommands.FirstOrDefault(x => x.CommandTag == commandTag) ??
                           Registry.PluginInstances.FirstOrDefault(plugin => plugin.HasCommand(commandTag))?.GetCommand(commandTag);
 
-            if (command is default) {
+            if (command is default(ICommand)) {
                 Error("Attempted to execute command {0} with params {1}; command was not found!", commandTag, string.Join(", ", args));
                 return default;
             }
@@ -155,7 +155,7 @@ namespace Samarium {
             foreach (var plugin in args) {
                 Warn("Attempting to unload plugin {0}...", plugin);
                 var instance = Registry.GetInstance(plugin.ToLowerInvariant());
-                if (instance is default) {
+                if (instance is default(IPlugin)) {
                     Error("Could not locate plugin {0}!", plugin);
                     continue;
                 }
